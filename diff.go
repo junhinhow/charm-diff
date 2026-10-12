@@ -51,8 +51,8 @@ func UnifiedDiff(old, new string) string {
 func UnifiedDiffWithOptions(old, new string, opts Options) string {
 	oldLines := splitLines(old)
 	newLines := splitLines(new)
-	ops := computeDiff(oldLines, newLines)
-	hunks := buildHunks(ops, opts.ContextLines)
+	res := computeDiffFull(oldLines, newLines)
+	hunks := buildHunks(res, opts.ContextLines)
 
 	if len(hunks) == 0 {
 		return ""
@@ -63,9 +63,7 @@ func UnifiedDiffWithOptions(old, new string, opts Options) string {
 
 	for _, hunk := range hunks {
 		// Cabecalho do hunk
-		header := fmt.Sprintf("@@ -%d,%d +%d,%d @@",
-			hunk.oldStart+1, hunk.oldCount, hunk.newStart+1, hunk.newCount)
-		buf.WriteString(style.HunkHeader.Render(header))
+		buf.WriteString(style.HunkHeader.Render(formatHunkHeader(hunk)))
 		buf.WriteString("\n")
 
 		for _, op := range hunk.ops {
@@ -243,130 +241,3 @@ func splitLines(s string) []string {
 	}
 	return lines
 }
-
-// Estrutura de um hunk no diff.
-type hunk struct {
-	oldStart int
-	oldCount int
-	newStart int
-	newCount int
-	ops      []diffOp
-}
-
-// Constroi hunks a partir das operacoes de diff com linhas de contexto.
-func buildHunks(ops []diffOp, contextLines int) []hunk {
-	if len(ops) == 0 {
-		return nil
-	}
-
-	// Identifica intervalos de mudancas
-	type changeRange struct {
-		start, end int
-	}
-	var changes []changeRange
-	for i, op := range ops {
-		if op.Kind != opEqual {
-			if len(changes) == 0 || i > changes[len(changes)-1].end+1 {
-				changes = append(changes, changeRange{i, i})
-			} else {
-				changes[len(changes)-1].end = i
-			}
-		}
-	}
-
-	if len(changes) == 0 {
-		return nil
-	}
-
-	// Agrupa mudancas proximas em hunks
-	var hunks []hunk
-	for _, ch := range changes {
-		start := ch.start - contextLines
-		if start < 0 {
-			start = 0
-		}
-		end := ch.end + contextLines + 1
-		if end > len(ops) {
-			end = len(ops)
-		}
-
-		// Mescla com hunk anterior se sobrepoem
-		if len(hunks) > 0 {
-			lastOps := hunks[len(hunks)-1].ops
-			lastEnd := 0
-			for _, o := range lastOps {
-				if o.OldLine >= 0 {
-					lastEnd = o.OldLine
-				}
-			}
-			firstOp := ops[start]
-			if firstOp.OldLine >= 0 && firstOp.OldLine <= lastEnd+1 {
-				// Extende o hunk anterior
-				for i := len(hunks[len(hunks)-1].ops); start+i-len(hunks[len(hunks)-1].ops) < end; i++ {
-					idx := start + i - len(hunks[len(hunks)-1].ops)
-					if idx >= start && idx < end {
-						// Evita duplicatas verificando se ja esta no hunk
-						found := false
-						for _, existing := range hunks[len(hunks)-1].ops {
-							if existing.OldLine == ops[idx].OldLine && existing.NewLine == ops[idx].NewLine {
-								found = true
-								break
-							}
-						}
-						if !found {
-							hunks[len(hunks)-1].ops = append(hunks[len(hunks)-1].ops, ops[idx])
-						}
-					}
-				}
-				recalculateHunk(&hunks[len(hunks)-1])
-				continue
-			}
-		}
-
-		h := hunk{ops: ops[start:end]}
-		recalculateHunk(&h)
-		hunks = append(hunks, h)
-	}
-
-	return hunks
-}
-
-// Recalcula os contadores de um hunk.
-func recalculateHunk(h *hunk) {
-	h.oldCount = 0
-	h.newCount = 0
-	h.oldStart = -1
-	h.newStart = -1
-
-	for _, op := range h.ops {
-		switch op.Kind {
-		case opEqual:
-			h.oldCount++
-			h.newCount++
-			if h.oldStart < 0 && op.OldLine >= 0 {
-				h.oldStart = op.OldLine
-			}
-			if h.newStart < 0 && op.NewLine >= 0 {
-				h.newStart = op.NewLine
-			}
-		case opDelete:
-			h.oldCount++
-			if h.oldStart < 0 && op.OldLine >= 0 {
-				h.oldStart = op.OldLine
-			}
-		case opInsert:
-			h.newCount++
-			if h.newStart < 0 && op.NewLine >= 0 {
-				h.newStart = op.NewLine
-			}
-		}
-	}
-
-	if h.oldStart < 0 {
-		h.oldStart = 0
-	}
-	if h.newStart < 0 {
-		h.newStart = 0
-	}
-}
-
