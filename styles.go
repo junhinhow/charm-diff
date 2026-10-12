@@ -1,6 +1,8 @@
 package charmdiff
 
 import (
+	"reflect"
+
 	"charm.land/lipgloss/v2"
 )
 
@@ -62,4 +64,15 @@ func TerminalStyle() DiffStyle {
 // DefaultStyle retorna o estilo padrao (Terminal).
 func DefaultStyle() DiffStyle {
 	return TerminalStyle()
+}
+
+// isZero informa se o estilo nao define nenhum atributo visual. Serve para
+// detectar o DiffStyle{} (zero) informado pelo usuario e usar o estilo padrao
+// em vez de renderizar o diff sem nenhuma cor.
+//
+// O lipgloss devolve Style{} (o valor zero) em NewStyle(), entao a
+// comparacao estrutural identifica exatamente os estilos sem cor, sem
+// atributos, sem bordas, sem preenchimento e sem transformacao.
+func (s DiffStyle) isZero() bool {
+	return reflect.DeepEqual(s, DiffStyle{})
 }

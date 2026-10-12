@@ -2,18 +2,39 @@
 //
 // Suporta dois modos de exibicao: unified diff e side-by-side diff,
 // ambos com numeracao de linhas, cores configuraveis e linhas de contexto.
+//
+// O formato do diff unificado acompanha o "git diff": os cabecalhos de hunk
+// (@@ -a,b +c,d @@), a selecao das linhas e a ordem das linhas sao identicas
+// as do git.
 package charmdiff
 
 import (
 	"fmt"
 	"strings"
+
+	"github.com/charmbracelet/x/ansi"
+)
+
+const (
+	// minLineNumWidth e a largura minima reservada para os numeros de linha.
+	minLineNumWidth = 4
+	// lineNumGap e o espaco entre os numeros de linha e o conteudo.
+	lineNumGap = 1
+	// sepWidth e a largura do separador " | " usado no modo lado a lado.
+	sepWidth = 3
 )
 
 // Opcoes de configuracao para geracao de diffs.
 type Options struct {
-	// Quantidade de linhas de contexto ao redor de cada mudanca (padrao: 3)
+	// Quantidade de linhas de contexto ao redor de cada mudanca (padrao: 3).
+	//
+	// Valores negativos sao normalizados para 0 (diff sem linhas de
+	// contexto) em vez de provocar panic ou esconder as mudancas.
 	ContextLines int
-	// Estilo visual para renderizacao
+	// Estilo visual para renderizacao.
+	//
+	// O valor zero (DiffStyle{}) e substituido pelo estilo padrao
+	// (DefaultStyle), evitando uma renderizacao silenciosa sem cores.
 	Style DiffStyle
 }
 
@@ -23,6 +44,21 @@ func DefaultOptions() Options {
 		ContextLines: 3,
 		Style:        DefaultStyle(),
 	}
+}
+
+// normalizeOptions valida e normaliza as opcoes recebidas pelo usuario:
+//
+//   - ContextLines negativo e tratado como 0 (sem linhas de contexto);
+//   - Style no valor zero e substituido pelo estilo padrao, para que o diff
+//     nunca seja renderizado sem cores de forma silenciosa.
+func normalizeOptions(opts Options) Options {
+	if opts.ContextLines < 0 {
+		opts.ContextLines = 0
+	}
+	if opts.Style.isZero() {
+		opts.Style = DefaultStyle()
+	}
+	return opts
 }
 
 // Tipo de operacao em cada linha do diff.
@@ -48,7 +84,12 @@ func UnifiedDiff(old, new string) string {
 }
 
 // UnifiedDiffWithOptions gera um diff unificado com opcoes personalizadas.
+//
+// As opcoes sao normalizadas antes do uso: um ContextLines negativo vira 0 e
+// um Style no valor zero vira o estilo padrao.
 func UnifiedDiffWithOptions(old, new string, opts Options) string {
+	opts = normalizeOptions(opts)
+
 	oldLines := splitLines(old)
 	newLines := splitLines(new)
 	res := computeDiffFull(oldLines, newLines)
@@ -57,6 +98,8 @@ func UnifiedDiffWithOptions(old, new string, opts Options) string {
 	if len(hunks) == 0 {
 		return ""
 	}
+
+	numWidth := lineNumWidthFor(len(oldLines), len(newLines))
 
 	var buf strings.Builder
 	style := opts.Style
@@ -67,7 +110,7 @@ func UnifiedDiffWithOptions(old, new string, opts Options) string {
 		buf.WriteString("\n")
 
 		for _, op := range hunk.ops {
-			lineNum := formatLineNumbers(op, style)
+			lineNum := formatLineNumbers(op, style, numWidth)
 			switch op.Kind {
 			case opEqual:
 				buf.WriteString(lineNum)
@@ -94,7 +137,17 @@ func SideBySideDiff(old, new string, width int) string {
 }
 
 // SideBySideDiffWithOptions gera um diff lado a lado com opcoes personalizadas.
+//
+// A largura informed e o limite superior da linha renderizada: quando o
+// terminal e estreito demais para caber duas colunas uteis, a largura e
+// elevada para o minimo viavel (veja minSideBySideWidth).
+//
+// O modo lado a lado mostra o arquivo inteiro (as diferencas sao destacadas,
+// mas o contexto nao e cortado); Options.ContextLines so vale para o diff
+// unificado.
 func SideBySideDiffWithOptions(old, new string, width int, opts Options) string {
+	opts = normalizeOptions(opts)
+
 	oldLines := splitLines(old)
 	newLines := splitLines(new)
 	ops := computeDiff(oldLines, newLines)
@@ -105,12 +158,14 @@ func SideBySideDiffWithOptions(old, new string, width int, opts Options) string 
 
 	style := opts.Style
 
-	// Largura de cada coluna: metade menos espaco para separador e numeros de linha
-	lineNumWidth := 4
-	sepWidth := 3
-	colWidth := (width - sepWidth - 2*lineNumWidth) / 2
-	if colWidth < 10 {
-		colWidth = 10
+	// A largura e repartida entre as duas colunas, descontando os numeros de
+	// linha, o espaco que os separa do texto e o separador central.
+	numWidth := lineNumWidthFor(len(oldLines), len(newLines))
+	width = clampSideBySideWidth(width, numWidth)
+	overhead := 2*(numWidth+lineNumGap) + sepWidth
+	colWidth := (width - overhead) / 2
+	if colWidth < 1 {
+		colWidth = 1
 	}
 
 	separator := style.Separator.Render(" | ")
@@ -120,21 +175,22 @@ func SideBySideDiffWithOptions(old, new string, width int, opts Options) string 
 
 	var buf strings.Builder
 	for _, pair := range pairs {
-		leftNum := "    "
+		leftNum := strings.Repeat(" ", numWidth)
 		leftText := ""
-		rightNum := "    "
+		rightNum := strings.Repeat(" ", numWidth)
 		rightText := ""
 
 		if pair.left != nil {
-			leftNum = style.LineNumber.Render(fmt.Sprintf("%4d", pair.left.OldLine+1))
+			leftNum = fmt.Sprintf("%*d", numWidth, pair.left.OldLine+1)
 			leftText = pair.left.Text
 		}
 		if pair.right != nil {
-			rightNum = style.LineNumber.Render(fmt.Sprintf("%4d", pair.right.NewLine+1))
+			rightNum = fmt.Sprintf("%*d", numWidth, pair.right.NewLine+1)
 			rightText = pair.right.Text
 		}
 
-		// Truncar ou preencher para largura fixa
+		// Truncar ou preencher para largura fixa (medida em celulas de
+		// exibicao, nunca em bytes).
 		leftText = padOrTruncate(leftText, colWidth)
 		rightText = padOrTruncate(rightText, colWidth)
 
@@ -155,11 +211,11 @@ func SideBySideDiffWithOptions(old, new string, width int, opts Options) string 
 			rightText = style.Context.Render(rightText)
 		}
 
-		buf.WriteString(leftNum)
+		buf.WriteString(style.LineNumber.Render(leftNum))
 		buf.WriteString(" ")
 		buf.WriteString(leftText)
 		buf.WriteString(separator)
-		buf.WriteString(rightNum)
+		buf.WriteString(style.LineNumber.Render(rightNum))
 		buf.WriteString(" ")
 		buf.WriteString(rightText)
 		buf.WriteString("\n")
@@ -205,35 +261,94 @@ func buildSideBySidePairs(ops []diffOp) []sidePair {
 	return pairs
 }
 
+// lineNumWidthFor calcula a largura necessaria para exibir os numeros de
+// linha dos dois arquivos. A largura nunca e menor que minLineNumWidth, o que
+// mantem a alinhacao dos arquivos pequenos.
+func lineNumWidthFor(oldCount, newCount int) int {
+	total := oldCount
+	if newCount > total {
+		total = newCount
+	}
+
+	digits := 1
+	for total >= 10 {
+		total /= 10
+		digits++
+	}
+
+	if digits < minLineNumWidth {
+		return minLineNumWidth
+	}
+	return digits
+}
+
+// lineNumPrefixWidth e a largura total do prefixo de numeros de linha
+// (numero antigo, espaco, numero novo e espaco).
+func lineNumPrefixWidth(numWidth int) int {
+	return 2*numWidth + 2*lineNumGap
+}
+
+// minSideBySideWidth e a menor largura viavel para o modo lado a lado:
+// dois numeros de linha, dois espacos, o separador e uma celula de conteudo
+// em cada coluna.
+func minSideBySideWidth(numWidth int) int {
+	return 2*(numWidth+lineNumGap) + sepWidth + 2
+}
+
+// clampSideBySideWidth garante que a largura informada comporta o layout
+// minimo do modo lado a lado.
+func clampSideBySideWidth(width, numWidth int) int {
+	if min := minSideBySideWidth(numWidth); width < min {
+		return min
+	}
+	return width
+}
+
 // Formata numeros de linha para exibicao.
-func formatLineNumbers(op diffOp, style DiffStyle) string {
-	old := "    "
-	new := "    "
+func formatLineNumbers(op diffOp, style DiffStyle, numWidth int) string {
+	old := strings.Repeat(" ", numWidth)
+	new := strings.Repeat(" ", numWidth)
 	if op.OldLine >= 0 {
-		old = fmt.Sprintf("%4d", op.OldLine+1)
+		old = fmt.Sprintf("%*d", numWidth, op.OldLine+1)
 	}
 	if op.NewLine >= 0 {
-		new = fmt.Sprintf("%4d", op.NewLine+1)
+		new = fmt.Sprintf("%*d", numWidth, op.NewLine+1)
 	}
 	return style.LineNumber.Render(old+" "+new) + " "
 }
 
-// Trunca ou preenche string para largura fixa.
+// padOrTruncate trunca ou preenche a string ate a largura informada, medida
+// em celulas de exibicao (e nunca em bytes, para nao cortar glifos
+// multibyte pela metade).
 func padOrTruncate(s string, width int) string {
-	if len(s) > width {
-		if width > 3 {
-			return s[:width-3] + "..."
-		}
-		return s[:width]
+	if width <= 0 {
+		return ""
 	}
-	return s + strings.Repeat(" ", width-len(s))
+
+	w := ansi.StringWidth(s)
+	if w <= width {
+		return s + strings.Repeat(" ", width-w)
+	}
+
+	if width > 3 {
+		return ansi.Truncate(s, width, "...")
+	}
+	return ansi.Truncate(s, width, "")
 }
 
-// Divide texto em linhas removendo terminador final vazio.
+// splitLines divide o texto em linhas, normalizando as quebras de linha
+// "\r\n" (Windows) e removendo o terminador final vazio.
+//
+// O "\r" e descartado porque, mantido dentro do texto estilizado, faz o
+// terminal devolver o cursor para a coluna 0 e corrompe o render.
 func splitLines(s string) []string {
 	if s == "" {
 		return nil
 	}
+
+	// Normaliza "\r\n" para "\n" (arquivos gerados no Windows).
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+
 	lines := strings.Split(s, "\n")
 	// Remove linha vazia final causada por \n no fim do texto
 	if len(lines) > 0 && lines[len(lines)-1] == "" {

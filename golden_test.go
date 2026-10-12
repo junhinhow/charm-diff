@@ -14,10 +14,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// prefixWidth e a largura do prefixo de numeros de linha do diff unificado
-// (numero antigo, espaco, numero novo e espaco).
-const prefixWidth = 10
-
 // gitUnifiedDiff executa "git diff --no-index -U<ctx>" para o par de textos
 // informado e devolve as linhas de hunk geradas pelo git (cabecalhos e
 // conteudo). O teste e pulado quando o git nao esta disponivel.
@@ -74,10 +70,11 @@ func gitUnifiedDiff(t *testing.T, old, new string, ctx int) []string {
 
 // charmUnifiedLines devolve as linhas do diff do charm-diff sem o prefixo de
 // numeros de linha, no mesmo formato usado pelo git.
-func charmUnifiedLines(out string) []string {
+func charmUnifiedLines(out string, numWidth int) []string {
 	if out == "" {
 		return nil
 	}
+	prefix := lineNumPrefixWidth(numWidth)
 	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
 	result := make([]string, 0, len(lines))
 	for _, line := range lines {
@@ -86,13 +83,20 @@ func charmUnifiedLines(out string) []string {
 			result = append(result, hunkHeaderOnly(line))
 			continue
 		}
-		if len(line) < prefixWidth {
+		if len(line) < prefix {
 			result = append(result, line)
 			continue
 		}
-		result = append(result, line[prefixWidth:])
+		result = append(result, line[prefix:])
 	}
 	return result
+}
+
+// charmUnifiedLinesFor calcula a largura dos numeros de linha e converte a
+// saida do charm-diff para o formato de linhas do git.
+func charmUnifiedLinesFor(old, new string, opts Options) []string {
+	numWidth := lineNumWidthFor(len(splitLines(old)), len(splitLines(new)))
+	return charmUnifiedLines(UnifiedDiffWithOptions(old, new, opts), numWidth)
 }
 
 // hunkHeaderOnly devolve apenas o cabecalho do hunk ("@@ -a,b +c,d @@"),
@@ -210,7 +214,7 @@ func TestUnifiedDiffIgualAoGit(t *testing.T) {
 		{
 			nome:    "caso da auditoria",
 			old:     "o00\no01\no02\no03\n",
-			new:     "n00\nn01\no02\nn03\n",
+			new:     "n00\no01\no02\nn03\n",
 			context: 3,
 		},
 		{
@@ -224,7 +228,7 @@ func TestUnifiedDiffIgualAoGit(t *testing.T) {
 	for _, tc := range casos {
 		t.Run(tc.nome, func(t *testing.T) {
 			opts := Options{ContextLines: tc.context, Style: DefaultStyle()}
-			got := charmUnifiedLines(UnifiedDiffWithOptions(tc.old, tc.new, opts))
+			got := charmUnifiedLinesFor(tc.old, tc.new, opts)
 			want := gitUnifiedDiff(t, tc.old, tc.new, tc.context)
 
 			if len(got) != len(want) {
@@ -292,7 +296,7 @@ func TestUnifiedDiffIgualAoGitAleatorio(t *testing.T) {
 
 		ctx := rng.Intn(4)
 		opts := Options{ContextLines: ctx, Style: DefaultStyle()}
-		got := charmUnifiedLines(UnifiedDiffWithOptions(oldText, newText, opts))
+		got := charmUnifiedLinesFor(oldText, newText, opts)
 		want := gitUnifiedDiff(t, oldText, newText, ctx)
 
 		if len(got) != len(want) {
@@ -326,8 +330,9 @@ func TestUnifiedDiffCabecalhoHunkSoInsercao(t *testing.T) {
 
 	for _, tc := range casos {
 		t.Run(tc.nome, func(t *testing.T) {
-			got := UnifiedDiffWithOptions(tc.old, tc.new, Options{ContextLines: 3, Style: DefaultStyle()})
-			linhas := charmUnifiedLines(got)
+			got := charmUnifiedLinesFor(tc.old, tc.new,
+				Options{ContextLines: 3, Style: DefaultStyle()})
+			linhas := got
 			if linhas[0] != tc.want {
 				t.Fatalf("cabecalho incorreto:\n got: %q\nwant: %q", linhas[0], tc.want)
 			}
@@ -342,14 +347,9 @@ func TestNumeroDeHunksIgualAoGit(t *testing.T) {
 	novo = strings.Replace(novo, "linha\n", "outra\n", 1)
 
 	opts := Options{ContextLines: 3, Style: DefaultStyle()}
-	got := charmUnifiedLines(UnifiedDiffWithOptions(old, novo, opts))
+	got := charmUnifiedLinesFor(old, novo, opts)
 
-	hunks := 0
-	for _, linha := range got {
-		if strings.HasPrefix(linha, "@@") {
-			hunks++
-		}
-	}
+	hunks := strings.Count(strings.Join(got, "\n"), "@@ -")
 	want := 0
 	for _, linha := range gitUnifiedDiff(t, old, novo, 3) {
 		if strings.HasPrefix(linha, "@@") {
@@ -358,8 +358,7 @@ func TestNumeroDeHunksIgualAoGit(t *testing.T) {
 	}
 
 	if hunks != want {
-		t.Fatalf("numero de hunks diferente: got %d, want %d\n%s", hunks, want,
-			strings.Join(got, "\n"))
+		t.Fatalf("numero de hunks diferente: got %d, want %d\n%s", hunks, want, got)
 	}
 }
 
@@ -370,7 +369,7 @@ func TestLinhasDeContextoIgualAoGit(t *testing.T) {
 	novo := strings.Replace(old, "l10\n", "X\n", 1)
 
 	opts := Options{ContextLines: 3, Style: DefaultStyle()}
-	got := charmUnifiedLines(UnifiedDiffWithOptions(old, novo, opts))
+	got := charmUnifiedLinesFor(old, novo, opts)
 	want := gitUnifiedDiff(t, old, novo, 3)
 
 	contextoGit := 0
