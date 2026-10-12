@@ -2,15 +2,17 @@
 
 Beautiful terminal diff viewer for the [Charmbracelet](https://charm.sh) ecosystem. Produces unified and side-by-side diffs with [Lip Gloss](https://github.com/charmbracelet/lipgloss) styling.
 
-> **[Leia em Portugues](README.pt-br.md)**
+> **[Read in Portuguese](README.pt-br.md)**
 
 ## Features
 
 - **Unified diff** — classic format with `+`/`-` markers and line numbers
-- **Side-by-side diff** — two-column comparison at any terminal width
+- **Git-compatible hunks** — hunk headers (`@@ -a,b +c,d @@`), line selection and line order are identical to `git diff -U<N>`
+- **Side-by-side diff** — two-column comparison that respects the requested width
 - **Configurable context lines** — show as many surrounding lines as you want (default: 3)
 - **Predefined styles** — GitHub-inspired and minimal terminal themes
 - **Custom styles** — build your own `DiffStyle` with any Lip Gloss style
+- **Linear memory** — the diff is computed with Myers' algorithm, so files with 10,000 lines do not exhaust the memory
 
 ## Install
 
@@ -27,6 +29,7 @@ package main
 
 import (
     "fmt"
+
     diff "github.com/junhinhow/charm-diff"
 )
 
@@ -63,6 +66,38 @@ fmt.Print(diff.SideBySideDiffWithOptions(old, new, 120, opts))
 | `TerminalStyle()` | Minimal ANSI colors (default) |
 | `GitHubStyle()` | Green/red backgrounds like GitHub |
 | `DiffStyle{...}` | Build your own with Lip Gloss styles |
+
+## Options
+
+| Option | Default | Behavior |
+|--------|---------|----------|
+| `ContextLines` | `3` | Lines of context kept around each change. A negative value is normalized to `0` (no context). |
+| `Style` | `DefaultStyle()` | Styles used to render the diff. The zero value (`DiffStyle{}`) falls back to `DefaultStyle()` instead of silently rendering without colors. |
+
+`Options.ContextLines` applies to the unified diff. The side-by-side view always shows the whole file and highlights the differences.
+
+## Git compatibility
+
+The unified diff is byte-for-byte identical to `git diff -U<N>` with respect to hunk headers, line selection and line order:
+
+```console
+$ diff.UnifiedDiff("a\nb\nc\n", "a\nX\nc\n")
+@@ -1,3 +1,3 @@
+   1    1  a
+   2      -b
+        2 +X
+   3    3  c
+```
+
+- The `,1` suffix is omitted when a range has a single line, exactly like git.
+- A hunk that only adds lines uses the position before the insertion (`@@ -0,0 +1,2 @@`).
+- The engine reproduces git's xdiff (Myers' algorithm in linear space), so the alignment of the changed blocks is the same as git's.
+
+Two differences remain: charm-diff does not emit the `\ No newline at end of file` marker, and the hunk header does not carry the function name that git may append.
+
+## Side-by-side width
+
+`SideBySideDiff(old, new, width)` never renders a line wider than `width`: the two columns share the space left by the line numbers and by the ` | ` separator. Widths below the minimum viable layout (`2 * (4 + 1) + 3 + 2 = 15` columns) are raised to that minimum.
 
 ## API Reference
 
