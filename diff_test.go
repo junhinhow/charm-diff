@@ -3,80 +3,208 @@ package charmdiff
 import (
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
-func TestUnifiedDiff_NoChanges(t *testing.T) {
-	text := "line1\nline2\nline3\n"
-	result := UnifiedDiff(text, text)
-	if result != "" {
-		t.Errorf("esperava diff vazio para textos iguais, obteve: %q", result)
+// TestUnifiedDiffSemMudancas verifica que textos identicos nao produzem diff.
+func TestUnifiedDiffSemMudancas(t *testing.T) {
+	texto := "line1\nline2\nline3\n"
+	if got := UnifiedDiff(texto, texto); got != "" {
+		t.Errorf("esperava diff vazio para textos iguais, obteve: %q", got)
 	}
 }
 
-func TestUnifiedDiff_Addition(t *testing.T) {
-	old := "line1\nline3\n"
-	new := "line1\nline2\nline3\n"
-	result := UnifiedDiff(old, new)
-	if !strings.Contains(result, "+line2") {
-		t.Errorf("esperava '+line2' no diff, obteve: %q", result)
+// TestUnifiedDiffCabecalhoGit verifica o formato do cabecalho de hunk no
+// mesmo estilo do git (a contagem ",1" e omitida quando ha uma unica linha).
+func TestUnifiedDiffCabecalhoGit(t *testing.T) {
+	casos := []struct {
+		nome    string
+		old     string
+		new     string
+		context int
+		want    string
+	}{
+		{
+			nome:    "uma linha em cada arquivo",
+			old:     "a\n",
+			new:     "b\n",
+			context: 3,
+			want:    "@@ -1 +1 @@",
+		},
+		{
+			nome:    "varias linhas",
+			old:     "a\nb\nc\n",
+			new:     "a\nX\nc\n",
+			context: 3,
+			want:    "@@ -1,3 +1,3 @@",
+		},
+		{
+			nome:    "insercao em arquivo vazio",
+			old:     "",
+			new:     "a\nb\n",
+			context: 3,
+			want:    "@@ -0,0 +1,2 @@",
+		},
+		{
+			nome:    "sem contexto",
+			old:     "a\nb\nc\n",
+			new:     "a\nx\nb\nc\n",
+			context: 0,
+			want:    "@@ -1,0 +2 @@",
+		},
+	}
+
+	for _, tc := range casos {
+		t.Run(tc.nome, func(t *testing.T) {
+			got := UnifiedDiffWithOptions(tc.old, tc.new,
+				Options{ContextLines: tc.context, Style: DefaultStyle()})
+			linhas := strings.Split(strings.TrimSuffix(got, "\n"), "\n")
+			if len(linhas) == 0 {
+				t.Fatal("diff vazio")
+			}
+			if got := ansi.Strip(linhas[0]); got != tc.want {
+				t.Errorf("cabecalho incorreto:\n got: %q\nwant: %q", got, tc.want)
+			}
+		})
 	}
 }
 
-func TestUnifiedDiff_Deletion(t *testing.T) {
-	old := "line1\nline2\nline3\n"
-	new := "line1\nline3\n"
-	result := UnifiedDiff(old, new)
-	if !strings.Contains(result, "-line2") {
-		t.Errorf("esperava '-line2' no diff, obteve: %q", result)
+// TestUnifiedDiffConteudo verifica o conteudo das linhas do diff (prefixo,
+// marcador e texto).
+func TestUnifiedDiffConteudo(t *testing.T) {
+	got := UnifiedDiffWithOptions("a\nb\nc\n", "a\nX\nc\n",
+		Options{ContextLines: 3, Style: DefaultStyle()})
+
+	linhas := strings.Split(strings.TrimSuffix(got, "\n"), "\n")
+	want := []string{
+		"@@ -1,3 +1,3 @@",
+		"   1    1  a",
+		"   2      -b",
+		"        2 +X",
+		"   3    3  c",
+	}
+
+	if len(linhas) != len(want) {
+		t.Fatalf("numero de linhas diferente: got %d, want %d\n%s",
+			len(linhas), len(want), got)
+	}
+	for i := range want {
+		if got := ansi.Strip(linhas[i]); got != want[i] {
+			t.Errorf("linha %d incorreta:\n got: %q\nwant: %q", i, got, want[i])
+		}
 	}
 }
 
-func TestSideBySideDiff_Basic(t *testing.T) {
-	old := "hello\nworld\n"
-	new := "hello\nearth\n"
-	result := SideBySideDiff(old, new, 80)
-	if result == "" {
-		t.Error("esperava resultado nao vazio para textos diferentes")
+// TestUnifiedDiffSemEstileUsaEstiloPadrao verifica que um DiffStyle no
+// valor zero nao renderiza o diff sem cores (achado 8 da auditoria).
+func TestUnifiedDiffSemEstileUsaEstiloPadrao(t *testing.T) {
+	got := UnifiedDiffWithOptions("a\n", "b\n", Options{ContextLines: 3})
+	if !strings.Contains(got, "\x1b[") {
+		t.Errorf("esperava cores no diff com Options sem Style, obteve: %q", got)
 	}
-	if !strings.Contains(result, "world") || !strings.Contains(result, "earth") {
-		t.Errorf("esperava 'world' e 'earth' no resultado, obteve: %q", result)
+
+	// O mesmo vale para o modo lado a lado.
+	sbs := SideBySideDiffWithOptions("a\n", "b\n", 80, Options{ContextLines: 3})
+	if !strings.Contains(sbs, "\x1b[") {
+		t.Errorf("esperava cores no diff lado a lado com Options sem Style, obteve: %q", sbs)
 	}
 }
 
-func TestSideBySideDiff_NoChanges(t *testing.T) {
-	text := "same\n"
-	result := SideBySideDiff(text, text, 80)
-	// Deve conter o texto, mas sem marcacoes de add/delete
-	if !strings.Contains(result, "same") {
-		t.Errorf("esperava 'same' no resultado, obteve: %q", result)
+// TestUnifiedDiffEstilePersonalizado verifica que um estilo valido e usado
+// como informado.
+func TestUnifiedDiffEstilePersonalizado(t *testing.T) {
+	estilo := GitHubStyle()
+	got := UnifiedDiffWithOptions("a\n", "b\n", Options{ContextLines: 3, Style: estilo})
+	if !strings.Contains(got, "\x1b[") {
+		t.Errorf("esperava cores do estilo GitHub, obteve: %q", got)
 	}
 }
 
-func TestComputeDiff_Empty(t *testing.T) {
-	ops := computeDiff(nil, nil)
-	if len(ops) != 0 {
+// TestSideBySideDiffEstrutura verifica as colunas do modo lado a lado.
+func TestSideBySideDiffEstrutura(t *testing.T) {
+	got := SideBySideDiff("hello\nworld\n", "hello\nearth\n", 80)
+	linhas := strings.Split(strings.TrimSuffix(got, "\n"), "\n")
+	if len(linhas) != 2 {
+		t.Fatalf("esperava 2 linhas, obteve %d: %q", len(linhas), got)
+	}
+
+	contexto := ansi.Strip(linhas[0])
+	if !strings.Contains(contexto, "hello") {
+		t.Errorf("esperava 'hello' na primeira linha, obteve: %q", contexto)
+	}
+	if !strings.Contains(contexto, " | ") {
+		t.Errorf("esperava o separador ' | ', obteve: %q", contexto)
+	}
+
+	alterado := ansi.Strip(linhas[1])
+	if !strings.Contains(alterado, "world") || !strings.Contains(alterado, "earth") {
+		t.Errorf("esperava 'world' e 'earth' na segunda linha, obteve: %q", alterado)
+	}
+}
+
+// TestSideBySideDiffSemMudancas mostra o arquivo nos dois lados.
+func TestSideBySideDiffSemMudancas(t *testing.T) {
+	got := SideBySideDiff("same\n", "same\n", 80)
+	if !strings.Contains(got, "same") {
+		t.Errorf("esperava 'same' no resultado, obteve: %q", got)
+	}
+}
+
+// TestComputeDiffVazio verifica que entradas vazias nao geram operacoes.
+func TestComputeDiffVazio(t *testing.T) {
+	if ops := computeDiff(nil, nil); len(ops) != 0 {
 		t.Errorf("esperava 0 operacoes para entradas vazias, obteve: %d", len(ops))
 	}
 }
 
+// TestSplitLines verifica a divisao em linhas.
 func TestSplitLines(t *testing.T) {
-	lines := splitLines("a\nb\nc\n")
-	if len(lines) != 3 {
-		t.Errorf("esperava 3 linhas, obteve: %d", len(lines))
+	linhas := splitLines("a\nb\nc\n")
+	if len(linhas) != 3 {
+		t.Fatalf("esperava 3 linhas, obteve: %d", len(linhas))
 	}
-	if lines[0] != "a" || lines[1] != "b" || lines[2] != "c" {
-		t.Errorf("conteudo inesperado: %v", lines)
+	if linhas[0] != "a" || linhas[1] != "b" || linhas[2] != "c" {
+		t.Errorf("conteudo inesperado: %v", linhas)
 	}
 }
 
+// TestLineNumWidthFor verifica o calculo da largura dos numeros de linha.
+func TestLineNumWidthFor(t *testing.T) {
+	casos := []struct {
+		old, new int
+		want     int
+	}{
+		{0, 0, 4},
+		{1, 1, 4},
+		{9999, 9999, 4},
+		{10000, 5, 5},
+		{1, 123456, 6},
+	}
+	for _, tc := range casos {
+		if got := lineNumWidthFor(tc.old, tc.new); got != tc.want {
+			t.Errorf("lineNumWidthFor(%d, %d) = %d, esperado %d",
+				tc.old, tc.new, got, tc.want)
+		}
+	}
+}
+
+// TestPadOrTruncate verifica o preenchimento e a truncagem por celulas de
+// exibicao.
 func TestPadOrTruncate(t *testing.T) {
-	result := padOrTruncate("hello", 10)
-	if len(result) != 10 {
-		t.Errorf("esperava comprimento 10, obteve: %d", len(result))
+	got := padOrTruncate("hello", 10)
+	if ansi.StringWidth(got) != 10 {
+		t.Errorf("esperava largura 10, obteve %d (%q)", ansi.StringWidth(got), got)
+	}
+	if got != "hello     " {
+		t.Errorf("preenchimento inesperado: %q", got)
 	}
 
-	result = padOrTruncate("hello world this is long", 10)
-	if len(result) != 10 {
-		t.Errorf("esperava comprimento 10, obteve: %d (%q)", len(result), result)
+	got = padOrTruncate("hello world this is long", 10)
+	if ansi.StringWidth(got) != 10 {
+		t.Errorf("esperava largura 10, obteve %d (%q)", ansi.StringWidth(got), got)
+	}
+	if !strings.HasSuffix(got, "...") {
+		t.Errorf("esperava o sufixo '...', obteve: %q", got)
 	}
 }
