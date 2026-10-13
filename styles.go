@@ -6,19 +6,19 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// DiffStyle define os estilos visuais para renderizacao de diffs.
+// DiffStyle define os estilos visuais para renderização de diffs.
 type DiffStyle struct {
 	// Estilo para linhas adicionadas
 	Addition lipgloss.Style
 	// Estilo para linhas removidas
 	Deletion lipgloss.Style
-	// Estilo para linhas de contexto (sem mudanca)
+	// Estilo para linhas de contexto (sem mudança)
 	Context lipgloss.Style
-	// Estilo para cabecalho do hunk (@@...@@)
+	// Estilo para cabeçalho do hunk (@@...@@)
 	HunkHeader lipgloss.Style
-	// Estilo para numeros de linha
+	// Estilo para números de linha
 	LineNumber lipgloss.Style
-	// Estilo para separador no modo side-by-side
+	// Estilo para separador no modo lado a lado
 	Separator lipgloss.Style
 }
 
@@ -43,7 +43,7 @@ func GitHubStyle() DiffStyle {
 	}
 }
 
-// TerminalStyle retorna um estilo minimalista usando cores ANSI basicas.
+// TerminalStyle retorna um estilo minimalista usando cores ANSI básicas.
 func TerminalStyle() DiffStyle {
 	return DiffStyle{
 		Addition: lipgloss.NewStyle().
@@ -61,18 +61,18 @@ func TerminalStyle() DiffStyle {
 	}
 }
 
-// DefaultStyle retorna o estilo padrao (Terminal).
+// DefaultStyle retorna o estilo padrão (Terminal).
 func DefaultStyle() DiffStyle {
 	return TerminalStyle()
 }
 
-// isZero informa se o estilo nao define nenhum atributo visual. Serve para
-// detectar o DiffStyle{} (zero) informado pelo usuario e usar o estilo padrao
+// isZero informa se o estilo não define nenhum atributo visual. Serve para
+// detectar o DiffStyle{} (zero) informado pelo usuário e usar o estilo padrão
 // em vez de renderizar o diff sem nenhuma cor.
 //
-// O lipgloss devolve Style{} (o valor zero) em NewStyle(), entao a
-// comparacao estrutural identifica exatamente os estilos sem cor, sem
-// atributos, sem bordas, sem preenchimento e sem transformacao.
+// O lipgloss devolve Style{} (o valor zero) em NewStyle(), então a
+// comparação estrutural identifica exatamente os estilos sem cor, sem
+// atributos, sem bordas, sem preenchimento e sem transformação.
 func (s DiffStyle) isZero() bool {
 	return reflect.DeepEqual(s, DiffStyle{})
 }

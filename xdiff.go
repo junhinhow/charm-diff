@@ -1,42 +1,42 @@
 package charmdiff
 
-// Motor de calculo de diff compativel com o git.
+// Motor de cálculo de diff compatível com o git.
 //
-// A implementacao reproduz o algoritmo do xdiff (o mesmo usado pelo git):
+// A implementação reproduz o algoritmo do xdiff (o mesmo usado pelo git):
 //
-//  1. as linhas dos dois arquivos sao classificadas (conteudos iguais recebem
+//  1. as linhas dos dois arquivos são classificadas (conteúdos iguais recebem
 //     o mesmo identificador);
-//  2. linhas sem correspondencia no outro arquivo sao descartadas
-//     antecipadamente (otimizacao do xdiff que tambem influi no resultado);
-//  3. o restante e comparado com o algoritmo de Myers (1986) em espaco
-//     linear, por divisao e conquista sobre a "middle snake";
-//  4. os blocos de mudanca sao deslizados ("compactados") para produzir o
+//  2. linhas sem correspondência no outro arquivo são descartadas
+//     antecipadamente (otimização do xdiff que também influi no resultado);
+//  3. o restante é comparado com o algoritmo de Myers (1986) em espaço
+//     linear, por divisão e conquista sobre a "middle snake";
+//  4. os blocos de mudança são deslizados ("compactados") para produzir o
 //     mesmo alinhamento do git;
-//  5. o roteiro de edicoes (script) e montado e os hunks sao gerados com o
-//     mesmo criterio de contexto do git.
+//  5. o roteiro de edições (script) é montado e os hunks são gerados com o
+//     mesmo critério de contexto do git.
 //
-// O resultado e byte-a-byte igual ao de "git diff" no que diz respeito aos
-// cabecalhos de hunk, a selecao de linhas e a ordem das linhas.
+// O resultado é byte a byte igual ao de "git diff" no que diz respeito aos
+// cabeçalhos de hunk, a seleção de linhas e a ordem das linhas.
 
 const (
-	// xdMaxEqLimit limita o numero de repeticoes de uma linha aceito como
+	// xdMaxEqLimit limita o número de repetições de uma linha aceito como
 	// "candidata" a casar com o outro arquivo.
 	xdMaxEqLimit = 1024
-	// xdSimScanWindow e a janela usada para avaliar linhas repetidas.
+	// xdSimScanWindow é a janela usada para avaliar linhas repetidas.
 	xdSimScanWindow = 100
-	// xdKpdisRun e o peso usado na decisao de descartar linhas repetidas.
+	// xdKpdisRun é o peso usado na decisão de descartar linhas repetidas.
 	xdKpdisRun = 4
-	// xdSnakeCnt e o tamanho minimo de um "snake" (sequencia de linhas iguais).
+	// xdSnakeCnt é o tamanho mínimo de um "snake" (sequência de linhas iguais).
 	xdSnakeCnt = 20
-	// xdKHeur e o peso da heuristica de caminho "interessante".
+	// xdKHeur é o peso da heurística de caminho "interessante".
 	xdKHeur = 4
-	// xdMaxCostMin e o custo maximo minimo de busca antes do corte.
+	// xdMaxCostMin é o custo máximo mínimo de busca antes do corte.
 	xdMaxCostMin = 256
-	// xdHeurMinCost e o custo a partir do qual a heuristica e avaliada.
+	// xdHeurMinCost é o custo a partir do qual a heurística é avaliada.
 	xdHeurMinCost = 256
 )
 
-// acoes do classificador de linhas.
+// ações do classificador de linhas.
 const (
 	xdDiscard uint8 = iota
 	xdKeep
@@ -44,13 +44,13 @@ const (
 )
 
 // xdiffFile guarda as linhas de um arquivo, os identificadores do seu
-// conteudo e as marcas das linhas alteradas.
+// conteúdo e as marcas das linhas alteradas.
 type xdiffFile struct {
 	lines   []string
 	ids     []int
 	changed []bool
-	// referenceIndex mapeia os indices de referencia (usados pelo algoritmo)
-	// para os indices reais das linhas.
+	// referenceIndex mapeia os índices de referência (usados pelo algoritmo)
+	// para os índices reais das linhas.
 	referenceIndex []int
 	nrec           int
 	nreff          int
@@ -68,8 +68,8 @@ func newXdiffFile(lines []string) *xdiffFile {
 	}
 }
 
-// changedAt informa se a linha de indice i foi alterada. As posicoes -1 e
-// nrec sao treated como linhas intactas (sentinelas).
+// changedAt informa se a linha de índice i foi alterada. As posições -1 e
+// nrec são tratadas como linhas intactas (sentinelas).
 func (f *xdiffFile) changedAt(i int) bool {
 	if i < 0 || i >= f.nrec {
 		return false
@@ -77,13 +77,13 @@ func (f *xdiffFile) changedAt(i int) bool {
 	return f.changed[i+1]
 }
 
-// setChanged marca a linha de indice i como alterada (ou intacta).
+// setChanged marca a linha de índice i como alterada (ou intacta).
 func (f *xdiffFile) setChanged(i int, v bool) {
 	f.changed[i+1] = v
 }
 
-// xdiffClassifier atribui um identificador unico a cada conteudo de linha e
-// conta as ocorrencias em cada arquivo.
+// xdiffClassifier atribui um identificador único a cada conteúdo de linha e
+// conta as ocorrências em cada arquivo.
 type xdiffClassifier struct {
 	ids  map[string]int
 	len1 []int
@@ -113,26 +113,26 @@ func (c *xdiffClassifier) classify(f *xdiffFile, pass int) {
 	}
 }
 
-// xdiffChange e um bloco de mudancas do roteiro de edicoes: chg1 linhas do
+// xdiffChange é um bloco de mudanças do roteiro de edições: chg1 linhas do
 // arquivo antigo e chg2 linhas do arquivo novo foram trocadas.
 type xdiffChange struct {
-	i1   int // inicio do bloco no arquivo antigo
-	i2   int // inicio do bloco no arquivo novo
+	i1   int // início do bloco no arquivo antigo
+	i2   int // início do bloco no arquivo novo
 	chg1 int // quantidade de linhas alteradas no arquivo antigo
 	chg2 int // quantidade de linhas alteradas no arquivo novo
 }
 
-// xdiffResult e o resultado completo do calculo de diff.
+// xdiffResult é o resultado completo do cálculo de diff.
 type xdiffResult struct {
 	old    *xdiffFile
 	new    *xdiffFile
 	ops    []diffOp
 	script []xdiffChange
-	// changeOpIndex[k] e o indice da primeira operacao do bloco k.
+	// changeOpIndex[k] é o índice da primeira operação do bloco k.
 	changeOpIndex []int
 }
 
-// xdiffSplit e o ponto de divisao encontrado na busca de Myers.
+// xdiffSplit é o ponto de divisão encontrado na busca de Myers.
 type xdiffSplit struct {
 	i1    int
 	i2    int
@@ -140,22 +140,22 @@ type xdiffSplit struct {
 	minHi int
 }
 
-// xdiffEnv guarda os parametros de custo da busca.
+// xdiffEnv guarda os parâmetros de custo da busca.
 type xdiffEnv struct {
 	mxcost   int
 	snakeCnt int
 	heurMin  int
-	// offset e o deslocamento usado para indexar os vetores de diagonais.
+	// offset é o deslocamento usado para indexar os vetores de diagonais.
 	offset int
 }
 
-// computeDiff calcula a sequencia de operacoes que transforma oldLines em
+// computeDiff calcula a sequência de operações que transforma oldLines em
 // newLines, com o mesmo alinhamento do git.
 func computeDiff(oldLines, newLines []string) []diffOp {
 	return computeDiffFull(oldLines, newLines).ops
 }
 
-// computeDiffFull calcula o diff completo (operacoes e roteiro de edicoes).
+// computeDiffFull calcula o diff completo (operações e roteiro de edições).
 func computeDiffFull(oldLines, newLines []string) *xdiffResult {
 	res := &xdiffResult{
 		old: newXdiffFile(oldLines),
@@ -166,17 +166,17 @@ func computeDiffFull(oldLines, newLines []string) *xdiffResult {
 		return res
 	}
 
-	// Classificacao dos conteudos.
+	// Classificação dos conteúdos.
 	class := newXdiffClassifier()
 	class.classify(res.old, 1)
 	class.classify(res.new, 2)
 
-	// Preparacao do ambiente: corte das pontas comuns e limpeza dos
-	// registros que nao tem correspondencia.
+	// Preparação do ambiente: corte das pontas comuns e limpeza dos
+	// registros que não têm correspondência.
 	xdiffTrimEnds(res.old, res.new)
 	xdiffCleanupRecords(class, res.old, res.new)
 
-	// Algoritmo de Myers em espaco linear.
+	// Algoritmo de Myers em espaço linear.
 	ndiags := res.old.nreff + res.new.nreff + 3
 	size := res.old.nreff + res.new.nreff + 5
 	kvdf := make([]int, size)
@@ -199,21 +199,21 @@ func computeDiffFull(oldLines, newLines []string) *xdiffResult {
 	xdiffRecsCmp(res.old, 0, res.old.nreff, res.new, 0, res.new.nreff,
 		kvdf, kvdb, 0, env)
 
-	// Compactacao dos blocos de mudanca (o mesmo ajuste do git).
+	// Compactação dos blocos de mudança (o mesmo ajuste do git).
 	xdiffChangeCompact(res.old, res.new)
 	xdiffChangeCompact(res.new, res.old)
 
-	// Roteiro de edicoes.
+	// Roteiro de edições.
 	res.script = xdiffBuildScript(res.old, res.new)
 	res.ops, res.changeOpIndex = xdiffBuildOps(res.old, res.new, res.script)
 
 	return res
 }
 
-// xdLineMax e o maior valor representavel, usado como sentinela.
+// xdLineMax é o maior valor representável, usado como sentinela.
 const xdLineMax = int(^uint(0) >> 1)
 
-// xdBogoSqrt estima a raiz quadrada de n (mesma heuristica do xdiff).
+// xdBogoSqrt estima a raiz quadrada de n (mesma heurística do xdiff).
 func xdBogoSqrt(n int) int {
 	i := 1
 	for ; n > 0; n >>= 2 {
@@ -245,8 +245,8 @@ func xdiffTrimEnds(f1, f2 *xdiffFile) {
 	f2.dend = f2.nrec - j - 1
 }
 
-// xdiffCleanupRecords descarta as linhas que nao tem correspondencia no outro
-// arquivo (elas sao sempre alteradas) e mantem as demais como candidatas.
+// xdiffCleanupRecords descarta as linhas que não têm correspondência no outro
+// arquivo (elas são sempre alteradas) e mantém as demais como candidatas.
 func xdiffCleanupRecords(c *xdiffClassifier, f1, f2 *xdiffFile) {
 	off := f1.dstart
 	len1 := f1.dend - off + 1
@@ -416,7 +416,7 @@ func xdiffRecsCmp(f1 *xdiffFile, off1, lim1 int, f2 *xdiffFile, off2, lim2 int,
 	}
 }
 
-// xdiffSplitSearch procura o ponto de divisao (middle snake) entre os trechos
+// xdiffSplitSearch procura o ponto de divisão (middle snake) entre os trechos
 // informados, usando as diagonais do Myers.
 func xdiffSplitSearch(f1 *xdiffFile, off1, lim1 int, f2 *xdiffFile, off2, lim2 int,
 	kvdf, kvdb []int, needMin int, spl *xdiffSplit, env *xdiffEnv) int {
@@ -437,7 +437,7 @@ func xdiffSplitSearch(f1 *xdiffFile, off1, lim1 int, f2 *xdiffFile, off2, lim2 i
 	for ec := 1; ; ec++ {
 		gotSnake := false
 
-		// Alarga o dominio das diagonais do caminho progressivo.
+		// Alarga o domínio das diagonais do caminho progressivo.
 		if fmin > dmin {
 			fmin--
 			kvdf[fmin-1+offset] = -1
@@ -478,7 +478,7 @@ func xdiffSplitSearch(f1 *xdiffFile, off1, lim1 int, f2 *xdiffFile, off2, lim2 i
 			}
 		}
 
-		// Alarga o dominio das diagonais do caminho reverso.
+		// Alarga o domínio das diagonais do caminho reverso.
 		if bmin > dmin {
 			bmin--
 			kvdb[bmin-1+offset] = xdLineMax
@@ -523,8 +523,8 @@ func xdiffSplitSearch(f1 *xdiffFile, off1, lim1 int, f2 *xdiffFile, off2, lim2 i
 			continue
 		}
 
-		// Heuristica: procura um caminho "interessante" quando o custo da
-		// busca ja e alto (mesma regra do xdiff).
+		// Heurística: procura um caminho "interessante" quando o custo da
+		// busca já é alto (mesma regra do xdiff).
 		if gotSnake && ec > env.heurMin {
 			best := 0
 			for d := fmax; d >= fmin; d -= 2 {
@@ -592,7 +592,7 @@ func xdiffSplitSearch(f1 *xdiffFile, off1, lim1 int, f2 *xdiffFile, off2, lim2 i
 		}
 
 		// Corte: a busca ficou cara demais, usa o caminho mais longe
-		// alcancado (mesma regra do xdiff).
+		// alcançado (mesma regra do xdiff).
 		if ec >= env.mxcost {
 			fbest, fbest1 := -1, -1
 			for d := fmax; d >= fmin; d -= 2 {
@@ -644,13 +644,13 @@ func xdiffSplitSearch(f1 *xdiffFile, off1, lim1 int, f2 *xdiffFile, off2, lim2 i
 	}
 }
 
-// xdlGroup e um grupo de linhas alteradas consecutivas de um arquivo.
+// xdlGroup é um grupo de linhas alteradas consecutivas de um arquivo.
 type xdlGroup struct {
 	start int
 	end   int
 }
 
-// xdiffGroupInit posiciona o grupo no inicio do arquivo.
+// xdiffGroupInit posiciona o grupo no início do arquivo.
 func xdiffGroupInit(f *xdiffFile) xdlGroup {
 	g := xdlGroup{0, 0}
 	for f.changedAt(g.end) {
@@ -659,7 +659,7 @@ func xdiffGroupInit(f *xdiffFile) xdlGroup {
 	return g
 }
 
-// xdiffGroupNext avanca para o proximo grupo.
+// xdiffGroupNext avança para o próximo grupo.
 func xdiffGroupNext(f *xdiffFile, g *xdlGroup) bool {
 	if g.end == f.nrec {
 		return false
@@ -681,7 +681,7 @@ func xdiffGroupPrevious(f *xdiffFile, g *xdlGroup) bool {
 	return true
 }
 
-// xdiffGroupSlideDown desloca o grupo para baixo, quando possivel.
+// xdiffGroupSlideDown desloca o grupo para baixo, quando possível.
 func xdiffGroupSlideDown(f *xdiffFile, g *xdlGroup) bool {
 	if g.end < f.nrec && f.lines[g.start] == f.lines[g.end] {
 		f.setChanged(g.start, false)
@@ -696,7 +696,7 @@ func xdiffGroupSlideDown(f *xdiffFile, g *xdlGroup) bool {
 	return false
 }
 
-// xdiffGroupSlideUp desloca o grupo para cima, quando possivel.
+// xdiffGroupSlideUp desloca o grupo para cima, quando possível.
 func xdiffGroupSlideUp(f *xdiffFile, g *xdlGroup) bool {
 	if g.start > 0 && f.lines[g.start-1] == f.lines[g.end-1] {
 		g.start--
@@ -711,7 +711,7 @@ func xdiffGroupSlideUp(f *xdiffFile, g *xdlGroup) bool {
 	return false
 }
 
-// xdiffChangeCompact desloca os blocos de mudanca para produzir um diff mais
+// xdiffChangeCompact desloca os blocos de mudança para produzir um diff mais
 // "natural", igual ao git.
 func xdiffChangeCompact(f *xdiffFile, fo *xdiffFile) {
 	g := xdiffGroupInit(f)
@@ -727,7 +727,7 @@ func xdiffChangeCompact(f *xdiffFile, fo *xdiffFile) {
 				groupSize = g.end - g.start
 				endMatchingOther = -1
 
-				// Desliza o grupo para cima o maximo possivel.
+				// Desliza o grupo para cima o máximo possível.
 				for xdiffGroupSlideUp(f, &g) {
 					if !xdiffGroupPrevious(fo, &goGroup) {
 						break
@@ -739,7 +739,7 @@ func xdiffChangeCompact(f *xdiffFile, fo *xdiffFile) {
 					endMatchingOther = g.end
 				}
 
-				// Desliza o grupo para baixo o maximo possivel.
+				// Desliza o grupo para baixo o máximo possível.
 				for {
 					if !xdiffGroupSlideDown(f, &g) {
 						break
@@ -759,9 +759,9 @@ func xdiffChangeCompact(f *xdiffFile, fo *xdiffFile) {
 
 			switch {
 			case g.end == earliestEnd:
-				// Nao foi possivel deslizar o grupo.
+				// Não foi possível deslizar o grupo.
 			case endMatchingOther != -1:
-				// Alinha o grupo com a ultima mudanca do outro arquivo.
+				// Alinha o grupo com a última mudança do outro arquivo.
 				for goGroup.end == goGroup.start {
 					if !xdiffGroupSlideUp(f, &g) {
 						break
@@ -782,7 +782,7 @@ func xdiffChangeCompact(f *xdiffFile, fo *xdiffFile) {
 	}
 }
 
-// xdiffBuildScript monta o roteiro de edicoes a partir das marcas de linhas
+// xdiffBuildScript monta o roteiro de edições a partir das marcas de linhas
 // alteradas dos dois arquivos.
 func xdiffBuildScript(f1, f2 *xdiffFile) []xdiffChange {
 	var script []xdiffChange
@@ -809,7 +809,7 @@ func xdiffBuildScript(f1, f2 *xdiffFile) []xdiffChange {
 		i2--
 	}
 
-	// A lista foi montada de tras para frente.
+	// A lista foi montada de trás para frente.
 	for l, r := 0, len(script)-1; l < r; l, r = l+1, r-1 {
 		script[l], script[r] = script[r], script[l]
 	}
@@ -817,15 +817,15 @@ func xdiffBuildScript(f1, f2 *xdiffFile) []xdiffChange {
 	return script
 }
 
-// xdiffBuildOps converte o roteiro de edicoes na lista de operacoes
-// (contexto, remocoes e inclusoes).
+// xdiffBuildOps converte o roteiro de edições na lista de operações
+// (contexto, remoções e inclusões).
 func xdiffBuildOps(f1, f2 *xdiffFile, script []xdiffChange) ([]diffOp, []int) {
 	ops := make([]diffOp, 0, f1.nrec+f2.nrec)
 	changeOpIndex := make([]int, 0, len(script))
 
 	i1, i2 := 0, 0
 	for _, ch := range script {
-		// Linhas de contexto entre as mudancas.
+		// Linhas de contexto entre as mudanças.
 		for i1 < ch.i1 && i2 < ch.i2 {
 			ops = append(ops, diffOp{
 				Kind:    opEqual,
