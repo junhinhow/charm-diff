@@ -11,7 +11,7 @@ import (
 )
 
 // TestRegressaoContextLinesNegativo verifica que um ContextLines negativo
-// nao provoca panic e, principalmente, nao esconde as mudancas.
+// não provoca panic e, principalmente, não esconde as mudanças.
 //
 // Antes: "ContextLines: -3" causava "panic: slice bounds out of range" e
 // "ContextLines: -1" devolvia um diff vazio.
@@ -25,18 +25,18 @@ func TestRegressaoContextLinesNegativo(t *testing.T) {
 				Options{ContextLines: ctx, Style: DefaultStyle()})
 
 			if got == "" {
-				t.Fatal("o diff nao pode ser vazio: as mudancas sumiram")
+				t.Fatal("o diff não pode ser vazio: as mudanças sumiram")
 			}
 			if !strings.Contains(ansi.Strip(got), "-b") {
-				t.Errorf("esperava a remocao de 'b', obteve: %q", ansi.Strip(got))
+				t.Errorf("esperava a remoção de 'b', obteve: %q", ansi.Strip(got))
 			}
 			if !strings.Contains(ansi.Strip(got), "+X") {
-				t.Errorf("esperava a insercao de 'X', obteve: %q", ansi.Strip(got))
+				t.Errorf("esperava a inserção de 'X', obteve: %q", ansi.Strip(got))
 			}
 			// Com contexto normalizado para 0, o hunk cobre apenas a
 			// linha alterada.
-			if cabecalho := ansi.Strip(strings.SplitN(got, "\n", 2)[0]); cabecalho != "@@ -2 +2 @@" {
-				t.Errorf("cabecalho inesperado: %q", cabecalho)
+			if cabeçalho := ansi.Strip(strings.SplitN(got, "\n", 2)[0]); cabeçalho != "@@ -2 +2 @@" {
+				t.Errorf("cabeçalho inesperado: %q", cabeçalho)
 			}
 		})
 	}
@@ -48,11 +48,11 @@ func TestRegressaoContextLinesNegativoLadoALado(t *testing.T) {
 	got := SideBySideDiffWithOptions("a\nb\nc\n", "a\nX\nc\n", 80,
 		Options{ContextLines: -3, Style: DefaultStyle()})
 	if got == "" {
-		t.Fatal("esperava um diff lado a lado nao vazio")
+		t.Fatal("esperava um diff lado a lado não vazio")
 	}
 }
 
-// TestRegressaoCRLF verifica que as quebras de linha "\r\n" sao normalizadas:
+// TestRegressaoCRLF verifica que as quebras de linha "\r\n" são normalizadas:
 // o "\r" deixado dentro do texto estilizado faz o terminal devolver o cursor
 // para a coluna 0 e corrompe o render.
 func TestRegressaoCRLF(t *testing.T) {
@@ -62,19 +62,19 @@ func TestRegressaoCRLF(t *testing.T) {
 	got := UnifiedDiffWithOptions(old, new, Options{ContextLines: 3, Style: DefaultStyle()})
 
 	if strings.ContainsRune(got, '\r') {
-		t.Errorf("o diff nao pode conter '\\r', obteve: %q", got)
+		t.Errorf("o diff não pode conter '\\r', obteve: %q", got)
 	}
 
-	// O conteudo precisa ser identico ao do texto com "\n".
+	// O conteúdo precisa ser idêntico ao do texto com "\n".
 	esperado := UnifiedDiffWithOptions("a\nb\nc\n", "a\nX\nc\n",
 		Options{ContextLines: 3, Style: DefaultStyle()})
 	if got != esperado {
-		t.Errorf("saida com CRLF difere da saida com LF:\n got: %q\nwant: %q",
+		t.Errorf("saída com CRLF difere da saída com LF:\n got: %q\nwant: %q",
 			got, esperado)
 	}
 }
 
-// TestRegressaoCRLFSplitLines verifica a normalizacao na divisao das linhas.
+// TestRegressaoCRLFSplitLines verifica a normalização na divisão das linhas.
 func TestRegressaoCRLFSplitLines(t *testing.T) {
 	linhas := splitLines("a\r\nb\r\nc\r\n")
 	if len(linhas) != 3 {
@@ -82,18 +82,18 @@ func TestRegressaoCRLFSplitLines(t *testing.T) {
 	}
 	for i, linha := range linhas {
 		if strings.ContainsRune(linha, '\r') {
-			t.Errorf("linha %d ainda contem '\\r': %q", i, linha)
+			t.Errorf("linha %d ainda contém '\\r': %q", i, linha)
 		}
 	}
 	if linhas[0] != "a" || linhas[1] != "b" || linhas[2] != "c" {
-		t.Errorf("conteudo inesperado: %v", linhas)
+		t.Errorf("conteúdo inesperado: %v", linhas)
 	}
 }
 
-// TestRegressaoLarguraSideBySide verifica que a saida lado a lado respeita a
+// TestRegressaoLarguraSideBySide verifica que a saída lado a lado respeita a
 // largura pedida.
 //
-// Antes: a largura era calculada sem os 2 espacos apos os numeros de linha,
+// Antes: a largura era calculada sem os 2 espaços após os números de linha,
 // produzindo uma linha 1-2 colunas mais larga que o pedido.
 func TestRegressaoLarguraSideBySide(t *testing.T) {
 	casos := []struct {
@@ -137,8 +137,8 @@ func TestRegressaoLarguraSideBySideMultibyte(t *testing.T) {
 	}
 }
 
-// TestRegressaoTruncagemMultibyte verifica que a truncagem nao corta glifos
-// multibyte pela metade (o resultado precisa ser UTF-8 valido).
+// TestRegressaoTruncagemMultibyte verifica que a truncagem não corta glifos
+// multibyte pela metade (o resultado precisa ser UTF-8 válido).
 func TestRegressaoTruncagemMultibyte(t *testing.T) {
 	casos := []string{
 		"áéíóú çãõ",
@@ -151,7 +151,7 @@ func TestRegressaoTruncagemMultibyte(t *testing.T) {
 		for largura := 1; largura <= 12; largura++ {
 			got := padOrTruncate(texto, largura)
 			if !utf8Valida(got) {
-				t.Errorf("largura %d: resultado nao e UTF-8 valido: %q", largura, got)
+				t.Errorf("largura %d: resultado não é UTF-8 válido: %q", largura, got)
 			}
 			if w := ansi.StringWidth(got); w > largura {
 				t.Errorf("largura %d: resultado com largura %d: %q", largura, w, got)
@@ -160,15 +160,15 @@ func TestRegressaoTruncagemMultibyte(t *testing.T) {
 	}
 }
 
-// utf8Valida informa se a string e uma sequencia UTF-8 valida.
+// utf8Valida informa se a string é uma sequência UTF-8 válida.
 func utf8Valida(s string) bool {
 	return utf8.ValidString(s)
 }
 
-// TestRegressaoMemoriaDezMilLinhas verifica que o calculo do diff nao usa
+// TestRegressaoMemoriaDezMilLinhas verifica que o cálculo do diff não usa
 // uma tabela O(n*m): 10.000 linhas exigiriam ~800 MB com o LCS.
 //
-// Com o algoritmo de Myers a memoria permanece linear.
+// Com o algoritmo de Myers a memória permanece linear.
 func TestRegressaoMemoriaDezMilLinhas(t *testing.T) {
 	const total = 10000
 
@@ -192,14 +192,14 @@ func TestRegressaoMemoriaDezMilLinhas(t *testing.T) {
 	alocado := depois.TotalAlloc - antes.TotalAlloc
 
 	if alocado > 128<<20 {
-		t.Errorf("memoria alocada alta para %d linhas: %d MB", total, alocado>>20)
+		t.Errorf("memória alocada alta para %d linhas: %d MB", total, alocado>>20)
 	}
 
 	plano := ansi.Strip(got)
 	if !strings.Contains(plano, "-linha 5000") {
-		t.Errorf("esperava a remocao da linha 5000")
+		t.Errorf("esperava a remoção da linha 5000")
 	}
 	if !strings.Contains(plano, "+linha alterada") {
-		t.Errorf("esperava a insercao da linha alterada")
+		t.Errorf("esperava a inserção da linha alterada")
 	}
 }

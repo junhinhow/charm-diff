@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// TestUnifiedDiffSemMudancas verifica que textos identicos nao produzem diff.
+// TestUnifiedDiffSemMudancas verifica que textos idênticos não produzem diff.
 func TestUnifiedDiffSemMudancas(t *testing.T) {
 	texto := "line1\nline2\nline3\n"
 	if got := UnifiedDiff(texto, texto); got != "" {
@@ -15,8 +15,8 @@ func TestUnifiedDiffSemMudancas(t *testing.T) {
 	}
 }
 
-// TestUnifiedDiffCabecalhoGit verifica o formato do cabecalho de hunk no
-// mesmo estilo do git (a contagem ",1" e omitida quando ha uma unica linha).
+// TestUnifiedDiffCabecalhoGit verifica o formato do cabeçalho de hunk no
+// mesmo estilo do git (a contagem ",1" é omitida quando há uma única linha).
 func TestUnifiedDiffCabecalhoGit(t *testing.T) {
 	casos := []struct {
 		nome    string
@@ -33,14 +33,14 @@ func TestUnifiedDiffCabecalhoGit(t *testing.T) {
 			want:    "@@ -1 +1 @@",
 		},
 		{
-			nome:    "varias linhas",
+			nome:    "várias linhas",
 			old:     "a\nb\nc\n",
 			new:     "a\nX\nc\n",
 			context: 3,
 			want:    "@@ -1,3 +1,3 @@",
 		},
 		{
-			nome:    "insercao em arquivo vazio",
+			nome:    "inserção em arquivo vazio",
 			old:     "",
 			new:     "a\nb\n",
 			context: 3,
@@ -64,13 +64,13 @@ func TestUnifiedDiffCabecalhoGit(t *testing.T) {
 				t.Fatal("diff vazio")
 			}
 			if got := ansi.Strip(linhas[0]); got != tc.want {
-				t.Errorf("cabecalho incorreto:\n got: %q\nwant: %q", got, tc.want)
+				t.Errorf("cabeçalho incorreto:\n got: %q\nwant: %q", got, tc.want)
 			}
 		})
 	}
 }
 
-// TestUnifiedDiffConteudo verifica o conteudo das linhas do diff (prefixo,
+// TestUnifiedDiffConteudo verifica o conteúdo das linhas do diff (prefixo,
 // marcador e texto).
 func TestUnifiedDiffConteudo(t *testing.T) {
 	got := UnifiedDiffWithOptions("a\nb\nc\n", "a\nX\nc\n",
@@ -86,7 +86,7 @@ func TestUnifiedDiffConteudo(t *testing.T) {
 	}
 
 	if len(linhas) != len(want) {
-		t.Fatalf("numero de linhas diferente: got %d, want %d\n%s",
+		t.Fatalf("número de linhas diferente: got %d, want %d\n%s",
 			len(linhas), len(want), got)
 	}
 	for i := range want {
@@ -97,7 +97,7 @@ func TestUnifiedDiffConteudo(t *testing.T) {
 }
 
 // TestUnifiedDiffSemEstileUsaEstiloPadrao verifica que um DiffStyle no
-// valor zero nao renderiza o diff sem cores (achado 8 da auditoria).
+// valor zero não renderiza o diff sem cores (achado 8 da auditoria).
 func TestUnifiedDiffSemEstileUsaEstiloPadrao(t *testing.T) {
 	got := UnifiedDiffWithOptions("a\n", "b\n", Options{ContextLines: 3})
 	if !strings.Contains(got, "\x1b[") {
@@ -111,7 +111,7 @@ func TestUnifiedDiffSemEstileUsaEstiloPadrao(t *testing.T) {
 	}
 }
 
-// TestUnifiedDiffEstilePersonalizado verifica que um estilo valido e usado
+// TestUnifiedDiffEstilePersonalizado verifica que um estilo válido é usado
 // como informado.
 func TestUnifiedDiffEstilePersonalizado(t *testing.T) {
 	estilo := GitHubStyle()
@@ -151,25 +151,25 @@ func TestSideBySideDiffSemMudancas(t *testing.T) {
 	}
 }
 
-// TestComputeDiffVazio verifica que entradas vazias nao geram operacoes.
+// TestComputeDiffVazio verifica que entradas vazias não geram operações.
 func TestComputeDiffVazio(t *testing.T) {
 	if ops := computeDiff(nil, nil); len(ops) != 0 {
-		t.Errorf("esperava 0 operacoes para entradas vazias, obteve: %d", len(ops))
+		t.Errorf("esperava 0 operações para entradas vazias, obteve: %d", len(ops))
 	}
 }
 
-// TestSplitLines verifica a divisao em linhas.
+// TestSplitLines verifica a divisão em linhas.
 func TestSplitLines(t *testing.T) {
 	linhas := splitLines("a\nb\nc\n")
 	if len(linhas) != 3 {
 		t.Fatalf("esperava 3 linhas, obteve: %d", len(linhas))
 	}
 	if linhas[0] != "a" || linhas[1] != "b" || linhas[2] != "c" {
-		t.Errorf("conteudo inesperado: %v", linhas)
+		t.Errorf("conteúdo inesperado: %v", linhas)
 	}
 }
 
-// TestLineNumWidthFor verifica o calculo da largura dos numeros de linha.
+// TestLineNumWidthFor verifica o cálculo da largura dos números de linha.
 func TestLineNumWidthFor(t *testing.T) {
 	casos := []struct {
 		old, new int
@@ -189,8 +189,8 @@ func TestLineNumWidthFor(t *testing.T) {
 	}
 }
 
-// TestPadOrTruncate verifica o preenchimento e a truncagem por celulas de
-// exibicao.
+// TestPadOrTruncate verifica o preenchimento e a truncagem por células de
+// exibição.
 func TestPadOrTruncate(t *testing.T) {
 	got := padOrTruncate("hello", 10)
 	if ansi.StringWidth(got) != 10 {

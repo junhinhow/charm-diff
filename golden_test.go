@@ -15,24 +15,24 @@ import (
 )
 
 // gitUnifiedDiff executa "git diff --no-index -U<ctx>" para o par de textos
-// informado e devolve as linhas de hunk geradas pelo git (cabecalhos e
-// conteudo). O teste e pulado quando o git nao esta disponivel.
+// informado e devolve as linhas de hunk geradas pelo git (cabeçalhos e
+// conteúdo). O teste é pulado quando o git não está disponível.
 func gitUnifiedDiff(t *testing.T, old, new string, ctx int) []string {
 	t.Helper()
 
 	gitBin, err := exec.LookPath("git")
 	if err != nil {
-		t.Skip("git nao esta disponivel no PATH: comparacao com o git ignorada")
+		t.Skip("git não está disponível no PATH: comparação com o git ignorada")
 	}
 
 	dir := t.TempDir()
 	oldPath := filepath.Join(dir, "old.txt")
 	newPath := filepath.Join(dir, "new.txt")
 	if err := os.WriteFile(oldPath, []byte(old), 0o600); err != nil {
-		t.Fatalf("nao foi possivel escrever o arquivo antigo: %v", err)
+		t.Fatalf("não foi possível escrever o arquivo antigo: %v", err)
 	}
 	if err := os.WriteFile(newPath, []byte(new), 0o600); err != nil {
-		t.Fatalf("nao foi possivel escrever o arquivo novo: %v", err)
+		t.Fatalf("não foi possível escrever o arquivo novo: %v", err)
 	}
 
 	cmd := exec.Command(gitBin,
@@ -44,7 +44,7 @@ func gitUnifiedDiff(t *testing.T, old, new string, ctx int) []string {
 	out, err := cmd.Output()
 	if err != nil {
 		var exitErr *exec.ExitError
-		// "git diff --no-index" devolve 1 quando existem diferencas.
+		// "git diff --no-index" devolve 1 quando existem diferenças.
 		if !errors.As(err, &exitErr) || exitErr.ExitCode() > 1 {
 			t.Fatalf("git diff falhou: %v", err)
 		}
@@ -56,8 +56,8 @@ func gitUnifiedDiff(t *testing.T, old, new string, ctx int) []string {
 		if inicio < 0 && strings.HasPrefix(line, "@@") {
 			inicio = i
 		}
-		// O git pode acrescentar o nome da funcao ao cabecalho; o
-		// charm-diff nao faz isso, entao o sufixo e descartado.
+		// O git pode acrescentar o nome da função ao cabeçalho; o
+		// charm-diff não faz isso, então o sufixo é descartado.
 		if strings.HasPrefix(line, "@@") {
 			lines[i] = hunkHeaderOnly(line)
 		}
@@ -69,7 +69,7 @@ func gitUnifiedDiff(t *testing.T, old, new string, ctx int) []string {
 }
 
 // charmUnifiedLines devolve as linhas do diff do charm-diff sem o prefixo de
-// numeros de linha, no mesmo formato usado pelo git.
+// números de linha, no mesmo formato usado pelo git.
 func charmUnifiedLines(out string, numWidth int) []string {
 	if out == "" {
 		return nil
@@ -92,15 +92,15 @@ func charmUnifiedLines(out string, numWidth int) []string {
 	return result
 }
 
-// charmUnifiedLinesFor calcula a largura dos numeros de linha e converte a
-// saida do charm-diff para o formato de linhas do git.
+// charmUnifiedLinesFor calcula a largura dos números de linha e converte a
+// saída do charm-diff para o formato de linhas do git.
 func charmUnifiedLinesFor(old, new string, opts Options) []string {
 	numWidth := lineNumWidthFor(len(splitLines(old)), len(splitLines(new)))
 	return charmUnifiedLines(UnifiedDiffWithOptions(old, new, opts), numWidth)
 }
 
-// hunkHeaderOnly devolve apenas o cabecalho do hunk ("@@ -a,b +c,d @@"),
-// descartando o contexto de funcao que o git pode acrescentar.
+// hunkHeaderOnly devolve apenas o cabeçalho do hunk ("@@ -a,b +c,d @@"),
+// descartando o contexto de função que o git pode acrescentar.
 func hunkHeaderOnly(header string) string {
 	rest := strings.TrimPrefix(header, "@@")
 	idx := strings.Index(rest, "@@")
@@ -117,8 +117,8 @@ func trimEmpty(lines []string) []string {
 	return lines
 }
 
-// TestUnifiedDiffIgualAoGit compara a saida do charm-diff com a saida real do
-// "git diff" para varios casos, verificando cabecalhos de hunk, selecao de
+// TestUnifiedDiffIgualAoGit compara a saída do charm-diff com a saída real do
+// "git diff" para vários casos, verificando cabeçalhos de hunk, seleção de
 // linhas e ordem.
 func TestUnifiedDiffIgualAoGit(t *testing.T) {
 	casos := []struct {
@@ -128,43 +128,43 @@ func TestUnifiedDiffIgualAoGit(t *testing.T) {
 		context int
 	}{
 		{
-			nome:    "insercao em arquivo vazio",
+			nome:    "inserção em arquivo vazio",
 			old:     "",
 			new:     "a\nb\n",
 			context: 3,
 		},
 		{
-			nome:    "insercao no inicio",
+			nome:    "inserção no início",
 			old:     "a\nb\n",
 			new:     "x\na\nb\n",
 			context: 3,
 		},
 		{
-			nome:    "insercao no meio",
+			nome:    "inserção no meio",
 			old:     "a\nb\nc\n",
 			new:     "a\nx\nb\nc\n",
 			context: 3,
 		},
 		{
-			nome:    "insercao no fim",
+			nome:    "inserção no fim",
 			old:     "a\nb\nc\n",
 			new:     "a\nb\nc\nd\n",
 			context: 3,
 		},
 		{
-			nome:    "remocao de tudo",
+			nome:    "remoção de tudo",
 			old:     "a\nb\n",
 			new:     "",
 			context: 3,
 		},
 		{
-			nome:    "remocao no inicio",
+			nome:    "remoção no início",
 			old:     "a\nb\nc\n",
 			new:     "b\nc\n",
 			context: 3,
 		},
 		{
-			nome:    "remocao no fim",
+			nome:    "remoção no fim",
 			old:     "a\nb\nc\n",
 			new:     "a\nb\n",
 			context: 3,
@@ -188,13 +188,13 @@ func TestUnifiedDiffIgualAoGit(t *testing.T) {
 			context: 0,
 		},
 		{
-			nome:    "sem contexto, remocao",
+			nome:    "sem contexto, remoção",
 			old:     "a\nb\nc\nd\n",
 			new:     "a\nc\nd\n",
 			context: 0,
 		},
 		{
-			nome:    "sem contexto, insercao no fim",
+			nome:    "sem contexto, inserção no fim",
 			old:     "a\nb\nc\n",
 			new:     "a\nb\nc\nd\n",
 			context: 0,
@@ -206,7 +206,7 @@ func TestUnifiedDiffIgualAoGit(t *testing.T) {
 			context: 3,
 		},
 		{
-			nome:    "hunks com um espacamento de contexto",
+			nome:    "hunks com um espaçamento de contexto",
 			old:     "l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\nl10\nl11\nl12\nl13\nl14\nl15\nl16\nl17\nl18\nl19\nl20\n",
 			new:     "l1\nX\nl3\nl4\nl5\nl6\nl7\nl8\nl9\nl10\nl11\nl12\nl13\nY\nl15\nl16\nl17\nl18\nl19\nl20\n",
 			context: 1,
@@ -214,11 +214,11 @@ func TestUnifiedDiffIgualAoGit(t *testing.T) {
 		{
 			nome:    "caso da auditoria",
 			old:     "o00\no01\no02\no03\n",
-			new:     "n00\no01\no02\nn03\n",
+			new:     "n00\nn01\no02\nn03\n",
 			context: 3,
 		},
 		{
-			nome:    "arquivo pequeno com varias mudancas",
+			nome:    "arquivo pequeno com várias mudanças",
 			old:     "um\ndois\ntres\nquatro\ncinco\nseis\nsete\n",
 			new:     "um\nDOIS\ntres\nquatro\ncinco\nSEIS\nsete\n",
 			context: 2,
@@ -232,12 +232,12 @@ func TestUnifiedDiffIgualAoGit(t *testing.T) {
 			want := gitUnifiedDiff(t, tc.old, tc.new, tc.context)
 
 			if len(got) != len(want) {
-				t.Fatalf("numero de linhas diferente: got %d, want %d\ngot:\n%s\nwant:\n%s",
+				t.Fatalf("número de linhas diferente: got %d, want %d\ngot:\n%s\nwant:\n%s",
 					len(got), len(want), strings.Join(got, "\n"), strings.Join(want, "\n"))
 			}
 			for i := range got {
 				if got[i] != want[i] {
-					t.Fatalf("linha %d diferente:\n got: %q\nwant: %q\nsaida completa:\n%s",
+					t.Fatalf("linha %d diferente:\n got: %q\nwant: %q\nsaída completa:\n%s",
 						i, got[i], want[i], strings.Join(got, "\n"))
 				}
 			}
@@ -245,11 +245,11 @@ func TestUnifiedDiffIgualAoGit(t *testing.T) {
 	}
 }
 
-// TestUnifiedDiffIgualAoGitAleatorio compara a saida com o git para um
-// conjunto deterministico de entradas aleatorias.
+// TestUnifiedDiffIgualAoGitAleatorio compara a saída com o git para um
+// conjunto determinístico de entradas aleatórias.
 func TestUnifiedDiffIgualAoGitAleatorio(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git nao esta disponivel no PATH: comparacao com o git ignorada")
+		t.Skip("git não está disponível no PATH: comparação com o git ignorada")
 	}
 
 	rng := rand.New(rand.NewSource(42))
@@ -265,20 +265,20 @@ func TestUnifiedDiffIgualAoGitAleatorio(t *testing.T) {
 		novo := make([]string, len(old))
 		copy(novo, old)
 
-		// Aplica algumas mudancas.
+		// Aplica algumas mudanças.
 		for m := 0; m < 1+rng.Intn(6); m++ {
 			switch rng.Intn(3) {
-			case 0: // remocao
+			case 0: // remoção
 				if len(novo) > 0 {
 					pos := rng.Intn(len(novo))
 					novo = append(novo[:pos], novo[pos+1:]...)
 				}
-			case 1: // insercao
+			case 1: // inserção
 				pos := rng.Intn(len(novo) + 1)
 				novo = append(novo, "")
 				copy(novo[pos+1:], novo[pos:])
 				novo[pos] = alfabeto[rng.Intn(len(alfabeto))]
-			case 2: // modificacao
+			case 2: // modificação
 				if len(novo) > 0 {
 					novo[rng.Intn(len(novo))] = alfabeto[rng.Intn(len(alfabeto))]
 				}
@@ -300,7 +300,7 @@ func TestUnifiedDiffIgualAoGitAleatorio(t *testing.T) {
 		want := gitUnifiedDiff(t, oldText, newText, ctx)
 
 		if len(got) != len(want) {
-			t.Fatalf("caso %d (ctx=%d): numero de linhas diferente: got %d, want %d\nantigo:\n%s\nnovo:\n%s\ngot:\n%s\nwant:\n%s",
+			t.Fatalf("caso %d (ctx=%d): número de linhas diferente: got %d, want %d\nantigo:\n%s\nnovo:\n%s\ngot:\n%s\nwant:\n%s",
 				caso, ctx, len(got), len(want), oldText, newText,
 				strings.Join(got, "\n"), strings.Join(want, "\n"))
 		}
@@ -313,8 +313,8 @@ func TestUnifiedDiffIgualAoGitAleatorio(t *testing.T) {
 	}
 }
 
-// TestUnifiedDiffCabecalhoHunkSoInsercao verifica o cabecalho de hunk apenas
-// de insercao, que deve usar a linha anterior a insercao (como o git).
+// TestUnifiedDiffCabecalhoHunkSoInsercao verifica o cabeçalho de hunk apenas
+// de inserção, que deve usar a linha anterior à inserção (como o git).
 func TestUnifiedDiffCabecalhoHunkSoInsercao(t *testing.T) {
 	casos := []struct {
 		nome string
@@ -323,18 +323,20 @@ func TestUnifiedDiffCabecalhoHunkSoInsercao(t *testing.T) {
 		want string
 	}{
 		{"arquivo vazio", "", "a\nb\n", "@@ -0,0 +1,2 @@"},
-		{"insercao no inicio", "a\n", "x\na\n", "@@ -1 +1,2 @@"},
-		{"insercao no meio", "a\nb\nc\n", "a\nx\nb\nc\n", "@@ -1,3 +1,4 @@"},
-		{"insercao no fim", "a\nb\nc\n", "a\nb\nc\nd\n", "@@ -1,3 +1,4 @@"},
+		{"inserção no início", "a\n", "x\na\n", "@@ -1 +1,2 @@"},
+		{"inserção no meio", "a\nb\nc\n", "a\nx\nb\nc\n", "@@ -1,3 +1,4 @@"},
+		{"inserção no fim", "a\nb\nc\n", "a\nb\nc\nd\n", "@@ -1,3 +1,4 @@"},
 	}
 
 	for _, tc := range casos {
 		t.Run(tc.nome, func(t *testing.T) {
-			got := charmUnifiedLinesFor(tc.old, tc.new,
-				Options{ContextLines: 3, Style: DefaultStyle()})
-			linhas := got
+			opts := Options{ContextLines: 3, Style: DefaultStyle()}
+			linhas := charmUnifiedLinesFor(tc.old, tc.new, opts)
+			if len(linhas) == 0 {
+				t.Fatal("diff vazio")
+			}
 			if linhas[0] != tc.want {
-				t.Fatalf("cabecalho incorreto:\n got: %q\nwant: %q", linhas[0], tc.want)
+				t.Fatalf("cabeçalho incorreto:\n got: %q\nwant: %q", linhas[0], tc.want)
 			}
 		})
 	}
@@ -349,7 +351,12 @@ func TestNumeroDeHunksIgualAoGit(t *testing.T) {
 	opts := Options{ContextLines: 3, Style: DefaultStyle()}
 	got := charmUnifiedLinesFor(old, novo, opts)
 
-	hunks := strings.Count(strings.Join(got, "\n"), "@@ -")
+	hunks := 0
+	for _, linha := range got {
+		if strings.HasPrefix(linha, "@@") {
+			hunks++
+		}
+	}
 	want := 0
 	for _, linha := range gitUnifiedDiff(t, old, novo, 3) {
 		if strings.HasPrefix(linha, "@@") {
@@ -358,12 +365,13 @@ func TestNumeroDeHunksIgualAoGit(t *testing.T) {
 	}
 
 	if hunks != want {
-		t.Fatalf("numero de hunks diferente: got %d, want %d\n%s", hunks, want, got)
+		t.Fatalf("número de hunks diferente: got %d, want %d\n%s", hunks, want,
+			strings.Join(got, "\n"))
 	}
 }
 
 // TestLinhasDeContextoIgualAoGit confere a quantidade de linhas de contexto
-// entre as mudancas com o git.
+// entre as mudanças com o git.
 func TestLinhasDeContextoIgualAoGit(t *testing.T) {
 	old := "l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\nl10\nl11\nl12\nl13\nl14\nl15\nl16\nl17\nl18\nl19\nl20\n"
 	novo := strings.Replace(old, "l10\n", "X\n", 1)
@@ -394,7 +402,7 @@ func TestLinhasDeContextoIgualAoGit(t *testing.T) {
 // golden depende dele).
 func TestGitDisponivel(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git nao esta disponivel no PATH")
+		t.Skip("git não está disponível no PATH")
 	}
 	out, err := exec.Command("git", "--version").Output()
 	if err != nil {

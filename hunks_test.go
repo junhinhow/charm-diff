@@ -8,11 +8,11 @@ import (
 )
 
 // TestHunksSobrepostos reproduz o caso da auditoria: a janela do hunk
-// comecava por uma insercao (OldLine == -1) e a fusao dos hunks era pulada,
+// começava por uma inserção (OldLine == -1) e a fusão dos hunks era pulada,
 // produzindo dois hunks sobrepostos.
 //
 // Antes: "@@ -1,4 +1,3 @@" seguido de "@@ -2,3 +1,4 @@".
-// Agora: um unico hunk "@@ -1,4 +1,4 @@".
+// Agora: um único hunk "@@ -1,4 +1,4 @@".
 func TestHunksSobrepostos(t *testing.T) {
 	old := "o00\no01\no02\no03\n"
 	new := "n00\nn01\no02\nn03\n"
@@ -20,23 +20,23 @@ func TestHunksSobrepostos(t *testing.T) {
 	got := UnifiedDiffWithOptions(old, new, Options{ContextLines: 3, Style: DefaultStyle()})
 	linhas := strings.Split(strings.TrimSuffix(got, "\n"), "\n")
 
-	cabecalhos := 0
+	cabeçalhos := 0
 	for _, linha := range linhas {
 		if strings.HasPrefix(ansi.Strip(linha), "@@") {
-			cabecalhos++
+			cabeçalhos++
 		}
 	}
 
-	if cabecalhos != 1 {
-		t.Fatalf("esperava 1 hunk, obteve %d:\n%s", cabecalhos, got)
+	if cabeçalhos != 1 {
+		t.Fatalf("esperava 1 hunk, obteve %d:\n%s", cabeçalhos, got)
 	}
-	if cabecalho := ansi.Strip(linhas[0]); cabecalho != "@@ -1,4 +1,4 @@" {
-		t.Errorf("cabecalho incorreto:\n got: %q\nwant: %q", cabecalho, "@@ -1,4 +1,4 @@")
+	if cabeçalho := ansi.Strip(linhas[0]); cabeçalho != "@@ -1,4 +1,4 @@" {
+		t.Errorf("cabeçalho incorreto:\n got: %q\nwant: %q", cabeçalho, "@@ -1,4 +1,4 @@")
 	}
 }
 
-// TestHunkSobrepostoComInsercaoNoInicio verifica que uma insercao no inicio
-// do arquivo nao gera hunks sobrepostos.
+// TestHunkSobrepostoComInsercaoNoInicio verifica que uma inserção no início
+// do arquivo não gera hunks sobrepostos.
 func TestHunkSobrepostoComInsercaoNoInicio(t *testing.T) {
 	old := "a\nb\nc\nd\n"
 	new := "X\na\nb\nc\nd\n"
@@ -48,8 +48,8 @@ func TestHunkSobrepostoComInsercaoNoInicio(t *testing.T) {
 	}
 }
 
-// TestHunkSomenteInsercao verifica o cabecalho de um hunk que contem apenas
-// linhas adicionadas: o git usa a posicao anterior a insercao.
+// TestHunkSomenteInsercao verifica o cabeçalho de um hunk que contém apenas
+// linhas adicionadas: o git usa a posição anterior à inserção.
 func TestHunkSomenteInsercao(t *testing.T) {
 	casos := []struct {
 		nome string
@@ -58,9 +58,9 @@ func TestHunkSomenteInsercao(t *testing.T) {
 		want string
 	}{
 		{"arquivo vazio", "", "a\nb\n", "@@ -0,0 +1,2 @@"},
-		{"insercao no inicio", "a\n", "x\na\n", "@@ -1 +1,2 @@"},
-		{"insercao no meio", "a\nb\nc\n", "a\nx\nb\nc\n", "@@ -1,3 +1,4 @@"},
-		{"insercao no fim", "a\nb\nc\n", "a\nb\nc\nd\n", "@@ -1,3 +1,4 @@"},
+		{"inserção no início", "a\n", "x\na\n", "@@ -1 +1,2 @@"},
+		{"inserção no meio", "a\nb\nc\n", "a\nx\nb\nc\n", "@@ -1,3 +1,4 @@"},
+		{"inserção no fim", "a\nb\nc\n", "a\nb\nc\nd\n", "@@ -1,3 +1,4 @@"},
 	}
 
 	for _, tc := range casos {
@@ -69,13 +69,13 @@ func TestHunkSomenteInsercao(t *testing.T) {
 				Options{ContextLines: 3, Style: DefaultStyle()})
 			linhas := strings.Split(strings.TrimSuffix(got, "\n"), "\n")
 			if got := ansi.Strip(linhas[0]); got != tc.want {
-				t.Errorf("cabecalho incorreto:\n got: %q\nwant: %q", got, tc.want)
+				t.Errorf("cabeçalho incorreto:\n got: %q\nwant: %q", got, tc.want)
 			}
 		})
 	}
 }
 
-// TestHunksSeparadosPorDistancia verifica que mudancas distantes geram hunks
+// TestHunksSeparadosPorDistancia verifica que mudanças distantes geram hunks
 // separados, com a quantidade de contexto correta.
 func TestHunksSeparadosPorDistancia(t *testing.T) {
 	linhas := make([]string, 20)
@@ -97,7 +97,7 @@ func TestHunksSeparadosPorDistancia(t *testing.T) {
 }
 
 // TestBuildHunksContextoNegativoNaoQuebra verifica que um contexto negativo
-// e tratado como 0 (nenhum panic, nenhuma mudanca escondida).
+// é tratado como 0 (nenhum panic, nenhuma mudança escondida).
 func TestBuildHunksContextoNegativoNaoQuebra(t *testing.T) {
 	res := computeDiffFull(splitLines("a\nb\nc\n"), splitLines("a\nX\nc\n"))
 
